@@ -1,0 +1,636 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>染色迷宫</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@500;700;900&family=Nunito:wght@800;900&display=swap">
+<style>
+:root {
+  --table: #2e1d12;
+  --table-2: #3a2617;
+  --ink: #fbeedd;
+  --muted: #c9ab8c;
+  --panel: #fff8ee;
+  --panel-ink: #4a2f1c;
+  --accent: #2f6fe0;
+  --star: #ffc53d;
+  --f-body: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --f-num: "Nunito", "Noto Sans SC", system-ui, sans-serif;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body {
+  color: var(--ink); font-family: var(--f-body); overflow: hidden;
+  background:
+    repeating-linear-gradient(92deg, rgba(0,0,0,.10) 0 2px, transparent 2px 9px, rgba(255,255,255,.025) 9px 11px, transparent 11px 23px),
+    radial-gradient(ellipse at 50% 40%, var(--table-2), var(--table) 75%);
+  background-color: var(--table);
+  -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none;
+}
+button { font-family: inherit; }
+.app {
+  height: 100%; max-width: 640px; margin: 0 auto; display: flex; flex-direction: column;
+  padding: max(10px, env(safe-area-inset-top)) 16px max(12px, env(safe-area-inset-bottom));
+}
+.top { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px; }
+.title { text-align: center; }
+.title h1 { margin: 0; font-size: 26px; font-weight: 900; letter-spacing: .12em; text-shadow: 0 2px 0 rgba(0,0,0,.45); }
+.title .sub { font-size: 13px; color: var(--muted); font-weight: 700; margin-top: 2px; }
+.stat { font: 900 13px var(--f-num); color: var(--muted); }
+.stat b { display: block; font-size: 22px; color: var(--ink); line-height: 1.1; font-variant-numeric: tabular-nums; }
+.stat.r { text-align: right; }
+.prog { height: 8px; border-radius: 4px; background: rgba(0,0,0,.35); margin: 10px 4px 0; overflow: hidden; box-shadow: inset 0 1px 2px rgba(0,0,0,.4); }
+.prog i { display: block; height: 100%; width: 0; background: var(--accent); border-radius: 4px; transition: width .15s; }
+#stage { flex: 1; min-height: 0; display: grid; place-items: center; touch-action: none; padding: 14px 0; cursor: grab; }
+#stage:active { cursor: grabbing; }
+canvas { display: block; border-radius: 10px; box-shadow: 0 18px 40px rgba(0,0,0,.55), 0 3px 0 #6e4423; }
+.tools { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.tool {
+  border: 0; border-radius: 14px; padding: 8px 4px 7px; background: rgba(255,240,220,.08); color: var(--ink);
+  display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: 12px; font-weight: 700; cursor: pointer;
+  box-shadow: inset 0 0 0 1px rgba(255,240,220,.10);
+}
+.tool:hover { background: rgba(255,240,220,.14); }
+.tool:disabled { opacity: .35; cursor: default; }
+.tool svg { width: 24px; height: 24px; }
+.tool:focus-visible, .big:focus-visible, .lv:focus-visible, .x:focus-visible { outline: 3px solid var(--star); outline-offset: 2px; }
+.hintline { text-align: center; font-size: 12px; color: var(--muted); margin-top: 8px; min-height: 16px; }
+
+.mask { position: fixed; inset: 0; background: rgba(20,10,4,.6); display: none; place-items: center; padding: 16px; z-index: 10; }
+.mask.on { display: grid; animation: fade .2s ease-out; }
+@keyframes fade { from { opacity: 0; } }
+.card {
+  width: min(420px, 100%); max-height: calc(100% - 20px); overflow: auto; background: var(--panel); color: var(--panel-ink);
+  border-radius: 20px; padding: 22px 20px 18px; box-shadow: 0 20px 60px rgba(0,0,0,.5); position: relative;
+}
+.mask.on .card { animation: rise .28s cubic-bezier(.2,1.4,.4,1); }
+@keyframes rise { from { transform: translateY(18px) scale(.94); } }
+.card h2 { margin: 0 0 6px; text-align: center; font-size: 24px; font-weight: 900; }
+.card p { margin: 6px 0; font-size: 14px; line-height: 1.65; }
+.card .x { position: absolute; right: 10px; top: 10px; width: 36px; height: 36px; border: 0; border-radius: 50%; background: transparent; color: var(--panel-ink); font-size: 22px; cursor: pointer; }
+.stars { display: flex; justify-content: center; gap: 6px; margin: 8px 0 4px; }
+.stars svg { width: 46px; height: 46px; }
+.stars .on { fill: var(--star); stroke: #d99a10; }
+.stars .off { fill: #e9dccb; stroke: #d5c3ad; }
+.stars svg.pop { animation: starpop .45s cubic-bezier(.2,1.6,.4,1) both; }
+@keyframes starpop { from { transform: scale(0) rotate(-40deg); } }
+.result { text-align: center; color: #8a6b52; font-size: 14px; font-weight: 700; }
+.btns { display: flex; gap: 10px; margin-top: 16px; }
+.big { flex: 1; border: 0; border-radius: 14px; padding: 12px; font-size: 16px; font-weight: 900; cursor: pointer; background: #efe2d0; color: var(--panel-ink); }
+.big.primary { background: var(--accent); color: #fff; box-shadow: 0 3px 0 rgba(0,0,0,.25); }
+.grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-top: 12px; }
+.lv {
+  aspect-ratio: 1; border: 0; border-radius: 12px; background: #efe2d0; color: var(--panel-ink); cursor: pointer;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; font: 900 18px var(--f-num); gap: 1px;
+}
+.lv small { font-size: 10px; letter-spacing: 1px; color: var(--star); text-shadow: 0 1px 0 rgba(0,0,0,.25); min-height: 12px; }
+.lv.cur { box-shadow: inset 0 0 0 3px var(--accent); }
+.lv:disabled { opacity: .4; cursor: default; }
+.world { font-size: 13px; font-weight: 900; color: #8a6b52; margin: 14px 0 -4px; display: flex; align-items: center; gap: 6px; }
+.world i { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
+kbd { font: 800 12px var(--f-num); background: #efe2d0; border-radius: 5px; padding: 1px 6px; border-bottom: 2px solid #d5c3ad; }
+</style>
+
+<div class="app">
+  <div class="top">
+    <div class="stat">步数<b id="moves">0</b></div>
+    <div class="title"><h1>染色迷宫</h1><div class="sub" id="sub">第 1 关</div></div>
+    <div class="stat r">目标<b id="par">–</b></div>
+  </div>
+  <div class="prog"><i id="bar"></i></div>
+  <div id="stage"><canvas id="cv"></canvas></div>
+  <div class="tools">
+    <button class="tool" id="bUndo" title="撤销 (Z)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>撤销</button>
+    <button class="tool" id="bRestart" title="重开 (R)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>重开</button>
+    <button class="tool" id="bHint" title="提示 (H)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.2 1 2V17h6v-.3c0-.8.4-1.5 1-2A7 7 0 0 0 12 2z"/></svg>提示</button>
+    <button class="tool" id="bLevels" title="选关 (L)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>选关</button>
+  </div>
+  <div class="hintline" id="hintline">滑动屏幕或按方向键让小球滚动</div>
+</div>
+
+<div class="mask" id="winMask"><div class="card">
+  <h2 id="winTitle">完成！</h2>
+  <div class="stars" id="winStars"></div>
+  <div class="result" id="winText"></div>
+  <div class="btns"><button class="big" id="bReplay">再玩一次</button><button class="big primary" id="bNext">下一关</button></div>
+</div></div>
+
+<div class="mask" id="lvMask"><div class="card">
+  <button class="x" id="lvClose" aria-label="关闭">×</button>
+  <h2>选关</h2>
+  <div id="lvList"></div>
+</div></div>
+
+<div class="mask" id="helpMask"><div class="card">
+  <h2>怎么玩</h2>
+  <p>小球一旦出发，就会沿着这个方向一直滚，<b>撞到墙才停下</b>，中途不能拐弯。</p>
+  <p>小球滚过的地方会被染上颜色。把迷宫里<b>所有通道都染满</b>就过关。</p>
+  <p><b>手机：</b>在屏幕上往哪边划，小球就往哪边滚。手指不松开继续划，可以连续操作。<br>
+     <b>电脑：</b>方向键或 <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 移动，<kbd>Z</kbd> 撤销，<kbd>R</kbd> 重开，<kbd>H</kbd> 提示。也可以用鼠标拖动。</p>
+  <p>每关都有一个目标步数，步数越少星星越多。</p>
+  <div class="btns"><button class="big primary" id="helpOk">开始</button></div>
+</div></div>
+
+<script>
+"use strict";
+/* ================= 基础工具 ================= */
+const LEVELS = 60;
+const STORE_KEY = "paint-maze-v1";
+function mulberry32(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+const PAINTS = [
+  { name: "海蓝", c: "#2f6fe0", hi: "#8cb8ff", lo: "#1a4aa8" },
+  { name: "莓红", c: "#e0457b", hi: "#ff9cc0", lo: "#a8244f" },
+  { name: "薄荷", c: "#22a86a", hi: "#86e6b5", lo: "#137046" },
+  { name: "橘子", c: "#f0821e", hi: "#ffc58a", lo: "#b55408" },
+  { name: "葡萄", c: "#8452dc", hi: "#c3a2ff", lo: "#5a2ea8" },
+  { name: "湖青", c: "#14a3ad", hi: "#86e3ea", lo: "#0b6d74" },
+];
+const worldOf = L => Math.floor((L - 1) / 10);
+const paintOf = L => PAINTS[worldOf(L) % PAINTS.length];
+
+/* ================= 关卡生成 =================
+ * 从起点出发，反复「模拟一次滚动」来挖通道：
+ * 选一个方向和停点，把路过的格子挖成通道，把停点后面那格永久定为墙。
+ * 永久墙不会再被挖开，所以之前每一步的停点都保持成立 —— 整个挖掘过程本身就是一个解。
+ */
+function sizeFor(L) {
+  const t = [[3, 5, 6], [8, 6, 7], [14, 7, 8], [21, 8, 10], [30, 9, 11], [40, 10, 12], [50, 11, 13], [60, 12, 14]];
+  for (const [upto, w, h] of t) if (L <= upto) return [w, h];
+  return [12, 14];
+}
+function carve(w, h, rng, target, revisit, blobK) {
+  const W = w + 2, H = h + 2, g = new Uint8Array(W * H); // 0 未定 1 通道 2 墙
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (x === 0 || y === 0 || x === W - 1 || y === H - 1) g[y * W + x] = 2;
+  const D = [-W, 1, W, -1];
+  const start = (1 + Math.floor(rng() * h)) * W + 1 + Math.floor(rng() * w);
+  g[start] = 1;
+  let pos = start, prev = -1, floor = 1, stall = 0;
+  const moves = [];
+  const blob = (cells) => { // 这一步会制造多少个 2×2 的大空地
+    for (const c of cells) g[c] = 1;
+    let n = 0;
+    for (const c of cells) for (const o of [0, -1, -W, -W - 1]) { const a = c + o; if (g[a] === 1 && g[a + 1] === 1 && g[a + W] === 1 && g[a + W + 1] === 1) n++; }
+    for (const c of cells) g[c] = 0;
+    return n;
+  };
+  while (floor < target && stall < 60 && moves.length < 400) {
+    const fresh = [], again = [];
+    for (let d = 0; d < 4; d++) {
+      let c = pos; const newCells = [];
+      while (g[c + D[d]] !== 2) {
+        c += D[d];
+        if (g[c] === 0) newCells.push(c);
+        if (g[c + D[d]] !== 1) { // 能停在这里
+          const cand = { d, c, nc: newCells.slice() };
+          (cand.nc.length ? fresh : again).push(cand);
+        }
+      }
+    }
+    let pick = null;
+    const againOk = again.filter(a => a.c !== prev);
+    if (fresh.length && !(againOk.length && rng() < revisit)) {
+      let sum = 0;
+      for (const f of fresh) { f.w = Math.pow(f.nc.length, 0.8) * Math.pow(blobK, blob(f.nc)) * (0.3 + rng()); sum += f.w; }
+      let r = rng() * sum;
+      for (const f of fresh) { r -= f.w; if (r <= 0) { pick = f; break; } }
+      pick = pick || fresh[fresh.length - 1];
+    } else if (againOk.length) {
+      pick = againOk[Math.floor(rng() * againOk.length)];
+      stall++;
+    } else break;
+    for (const c of pick.nc) { g[c] = 1; floor++; }
+    if (g[pick.c + D[pick.d]] === 0) g[pick.c + D[pick.d]] = 2;
+    moves.push(pick.d); prev = pos; pos = pick.c;
+  }
+  for (let i = 0; i < g.length; i++) if (g[i] === 0) g[i] = 2;
+  // 裁掉四周整行整列都是墙的空边
+  let x0 = W, x1 = 0, y0 = H, y1 = 0;
+  for (let i = 0; i < g.length; i++) if (g[i] === 1) { const x = i % W, y = (i / W) | 0; x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
+  const W2 = x1 - x0 + 3, H2 = y1 - y0 + 3, g2 = new Uint8Array(W2 * H2).fill(2);
+  const map = i => ((i / W | 0) - y0 + 1) * W2 + (i % W) - x0 + 1;
+  for (let i = 0; i < g.length; i++) if (g[i] === 1) g2[map(i)] = 1;
+  return { W: W2, H: H2, g: g2, start: map(start), sol: moves, floor };
+}
+const levelCache = new Map();
+// 每 10 关一章：整章一起生成，再按目标步数从少到多排序，保证章节内难度单调上升
+function getLevel(L) {
+  if (levelCache.has(L)) return levelCache.get(L);
+  const base = worldOf(L) * 10, list = [];
+  for (let k = 1; k <= 10; k++) list.push(buildLevel(base + k));
+  list.sort((a, b) => a.par - b.par || a.n - b.n);
+  list.forEach((lv, i) => { lv.L = base + i + 1; levelCache.set(lv.L, lv); });
+  return levelCache.get(L);
+}
+function buildLevel(L) {
+  const [w, h] = sizeFor(L);
+  const t = Math.min(1, (L - 1) / 45);
+  const target = Math.round(w * h * (0.46 + 0.12 * t));
+  const revisit = 0.04 + 0.3 * t;
+  const blobK = 0.04 + 0.1 * t; // 后期允许少量宽通道，增加分岔
+  const minMoves = Math.round(4 + L * 0.45);
+  let best = null;
+  for (let a = 0; a < 40; a++) {
+    const lv = carve(w, h, mulberry32(L * 7919 + a * 104729 + 17), target, revisit, blobK);
+    const score = Math.min(lv.floor / target, 1) * 10 + Math.min(lv.sol.length / minMoves, 1) * 3;
+    lv.score = score;
+    if (!best || score > best.score) best = lv;
+    if (lv.floor >= target * 0.95 && lv.sol.length >= minMoves) break;
+  }
+  const lv = best;
+  lv.L = L;
+  lv.idx = new Int16Array(lv.g.length).fill(-1);
+  lv.n = 0;
+  for (let i = 0; i < lv.g.length; i++) if (lv.g[i] === 1) lv.idx[i] = lv.n++;
+  lv.bits = []; for (let i = 0; i < lv.n; i++) lv.bits.push(1n << BigInt(i));
+  lv.full = (1n << BigInt(lv.n)) - 1n;
+  lv.memo = new Map();
+  // 目标步数：先在限定规模内做 BFS 找最短解，找不到就用生成路线和贪心解里较短的那个
+  const b = bfs(lv, lv.start, lv.bits[lv.idx[lv.start]], 30000);
+  if (b) { lv.par = b.length; lv.parExact = true; }
+  else {
+    const g2 = beam(lv, lv.start, lv.bits[lv.idx[lv.start]], 400);
+    lv.par = Math.min(lv.sol.length, g2 ? g2.length : Infinity); lv.parExact = false;
+  }
+  return lv;
+}
+
+/* ================= 求解器 ================= */
+function slide(lv, p, d) {
+  const k = p * 4 + d; let r = lv.memo.get(k);
+  if (r) return r;
+  const Dd = [-lv.W, 1, lv.W, -1][d];
+  let c = p, m = 0n;
+  while (lv.g[c + Dd] === 1) { c += Dd; m |= lv.bits[lv.idx[c]]; }
+  r = { to: c, m }; lv.memo.set(k, r);
+  return r;
+}
+function bfs(lv, p0, m0, cap) {
+  if (m0 === lv.full) return [];
+  const P = [p0], M = [m0], par = [-1], dir = [-1];
+  const seen = new Set([p0 + ":" + m0.toString(36)]);
+  for (let h = 0; h < P.length; h++) {
+    for (let d = 0; d < 4; d++) {
+      const r = slide(lv, P[h], d);
+      if (r.to === P[h]) continue;
+      const nm = M[h] | r.m, key = r.to + ":" + nm.toString(36);
+      if (seen.has(key)) continue;
+      seen.add(key); P.push(r.to); M.push(nm); par.push(h); dir.push(d);
+      if (nm === lv.full) {
+        const out = []; for (let i = P.length - 1; i > 0; i = par[i]) out.push(dir[i]);
+        return out.reverse();
+      }
+    }
+    if (P.length > cap) return null;
+  }
+  return null; // 已经无解（走进死局）
+}
+function pop32(v) { v = v - ((v >>> 1) & 0x55555555); v = (v & 0x33333333) + ((v >>> 2) & 0x33333333); return (((v + (v >>> 4)) & 0xF0F0F0F) * 0x1010101) >>> 24; }
+function popcnt(x) { let n = 0; while (x) { n += pop32(Number(x & 0xffffffffn)); x >>= 32n; } return n; }
+// 大关卡用束搜索：每一步只保留染色最多的若干个局面，找一条较短的解
+function beam(lv, p0, m0, width) {
+  if (m0 === lv.full) return [];
+  let layer = [{ p: p0, m: m0, c: popcnt(m0), prev: null, d: -1 }];
+  const seen = new Set([p0 + ":" + m0.toString(36)]);
+  for (let depth = 0; depth < 500 && layer.length; depth++) {
+    const next = [];
+    for (const s of layer) for (let d = 0; d < 4; d++) {
+      const r = slide(lv, s.p, d);
+      if (r.to === s.p) continue;
+      const nm = s.m | r.m, key = r.to + ":" + nm.toString(36);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const node = { p: r.to, m: nm, c: nm === s.m ? s.c : popcnt(nm), prev: s, d };
+      if (nm === lv.full) { const out = []; for (let n = node; n.prev; n = n.prev) out.push(n.d); return out.reverse(); }
+      next.push(node);
+    }
+    next.sort((a, b) => b.c - a.c);
+    layer = next.slice(0, width);
+  }
+  return null;
+}
+
+/* ================= 存档 ================= */
+let save = { unlocked: 1, stars: {}, cur: 1, seenHelp: false };
+try { const s = JSON.parse(localStorage.getItem(STORE_KEY)); if (s && typeof s === "object") save = Object.assign(save, s); } catch (e) {}
+function persist() { try { localStorage.setItem(STORE_KEY, JSON.stringify(save)); } catch (e) {} }
+
+/* ================= 游戏状态 ================= */
+const $ = id => document.getElementById(id);
+const cv = $("cv"), ctx = cv.getContext("2d");
+let lv, paint, pos, painted, paintAt, count, moves, history, anim, queue, won, hint, hintUsed, particles, bump;
+let S = 32, dpr = 1, baseLayer, shadeLayer, pattern;
+
+function loadLevel(L) {
+  L = Math.max(1, Math.min(LEVELS, L));
+  save.cur = L; persist();
+  lv = getLevel(L); paint = paintOf(L);
+  document.documentElement.style.setProperty("--accent", paint.c);
+  pos = lv.start;
+  painted = new Uint8Array(lv.g.length); paintAt = new Float64Array(lv.g.length);
+  painted[pos] = 1; paintAt[pos] = performance.now(); count = 1;
+  moves = 0; history = []; anim = null; queue = []; won = false; hint = null; hintUsed = false; particles = []; bump = null;
+  $("sub").textContent = `第 ${L} 关 · ${paint.name}`;
+  $("par").textContent = lv.par;
+  layout(); updateHud();
+  hideMask("winMask");
+}
+function updateHud() {
+  $("moves").textContent = moves;
+  $("bar").style.width = (count / lv.n * 100).toFixed(1) + "%";
+  $("bUndo").disabled = !history.length || won;
+  const left = lv.n - count;
+  $("hintline").textContent = won ? "全部染满！" : (moves === 0 ? "滑动屏幕或按方向键让小球滚动" : `还剩 ${left} 格没染色`);
+}
+
+function tryMove(d) {
+  if (won) return;
+  if (anim) { if (queue.length < 2) queue.push(d); return; }
+  const D = [-lv.W, 1, lv.W, -1][d];
+  let c = pos, n = 0;
+  while (lv.g[c + D] === 1) { c += D; n++; }
+  if (n === 0) { bump = { d, t0: performance.now() }; return; }
+  history.push({ pos, painted: painted.slice(), count, moves });
+  hint = null;
+  moves++;
+  anim = { from: pos, d, D, n, t0: performance.now(), dur: 70 + n * 38, done: 0 };
+  updateHud();
+}
+function undo() {
+  if (!history.length || won) return;
+  const h = history.pop();
+  anim = null; queue = []; hint = null;
+  pos = h.pos; painted = h.painted; count = h.count; moves = h.moves;
+  updateHud();
+}
+function restart() { if (moves || won) loadLevel(lv.L); }
+function showHint() {
+  if (won || anim) return;
+  const m = paintedMask();
+  let s = bfs(lv, pos, m, 20000);
+  if (!s) s = beam(lv, pos, m, 400);
+  if (s && s.length) { hint = { d: s[0], t0: performance.now() }; hintUsed = true; $("hintline").textContent = `提示：往${"上右下左"[s[0]]}滚`; }
+  else if (!s) { $("hintline").textContent = "从这里好像走不通了，试试撤销几步或重开"; }
+}
+function paintedMask() { let m = 0n; for (let i = 0; i < lv.g.length; i++) if (painted[i]) m |= lv.bits[lv.idx[i]]; return m; }
+
+function step(now) {
+  if (anim) {
+    const t = Math.min(1, (now - anim.t0) / anim.dur);
+    const f = t < 1 ? 1 - Math.pow(1 - t, 2.2) : 1;
+    const reach = Math.min(anim.n, Math.floor(f * anim.n + 0.5));
+    for (let i = anim.done + 1; i <= reach; i++) {
+      const c = anim.from + i * anim.D;
+      if (!painted[c]) { painted[c] = 1; paintAt[c] = now; count++; }
+    }
+    anim.done = reach; anim.f = f;
+    if (t >= 1) {
+      pos = anim.from + anim.n * anim.D;
+      bump = { d: anim.d, t0: now, soft: true };
+      anim = null; updateHud();
+      if (count === lv.n) win();
+      else if (queue.length) tryMove(queue.shift());
+    }
+  }
+}
+
+function win() {
+  won = true; queue = [];
+  const stars = moves <= lv.par ? 3 : moves <= Math.ceil(lv.par * 1.4) ? 2 : 1;
+  const L = lv.L;
+  save.stars[L] = Math.max(save.stars[L] || 0, stars);
+  save.unlocked = Math.max(save.unlocked, Math.min(LEVELS, L + 1));
+  persist(); updateHud();
+  const [bx, by] = ballXY(performance.now());
+  for (let i = 0; i < 70; i++) {
+    const a = Math.random() * Math.PI * 2, v = (2 + Math.random() * 5) * S / 32;
+    particles.push({ x: bx, y: by, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 2, life: 1, c: [paint.c, paint.hi, "#ffc53d", "#fff"][i % 4], r: 2 + Math.random() * 3 });
+  }
+  setTimeout(() => {
+    if (!won) return;
+    $("winTitle").textContent = L === LEVELS ? "全部通关！" : ["完成！", "漂亮！", "完美！"][stars - 1];
+    const box = $("winStars"); box.innerHTML = "";
+    for (let i = 0; i < 3; i++) box.insertAdjacentHTML("beforeend", `<svg viewBox="0 0 24 24" class="${i < stars ? "on pop" : "off"}" style="animation-delay:${i * .15}s"><path stroke-width="1.2" stroke-linejoin="round" d="M12 2.6l2.9 5.9 6.5.9-4.7 4.6 1.1 6.5L12 17.4l-5.8 3.1 1.1-6.5L2.6 9.4l6.5-.9z"/></svg>`);
+    $("winText").textContent = `用了 ${moves} 步 · 目标 ${lv.par} 步` + (stars < 3 ? `（${lv.par} 步内三星）` : "");
+    $("bNext").style.display = L === LEVELS ? "none" : "";
+    showMask("winMask");
+    $(L === LEVELS ? "bReplay" : "bNext").focus();
+    if (L < LEVELS) setTimeout(() => getLevel(L + 1), 450); // 进入新章节时需要生成整章，趁弹窗时提前做
+  }, 750);
+}
+
+/* ================= 绘制 ================= */
+function layout() {
+  const st = $("stage"), r = st.getBoundingClientRect();
+  const aw = r.width, ah = r.height - 28;
+  S = Math.max(14, Math.floor(Math.min(aw / lv.W, ah / lv.H, 64)));
+  dpr = Math.min(3, window.devicePixelRatio || 1);
+  cv.width = lv.W * S * dpr; cv.height = lv.H * S * dpr;
+  cv.style.width = lv.W * S + "px"; cv.style.height = lv.H * S + "px";
+  buildLayers();
+}
+function mkCanvas(w, h) { const c = document.createElement("canvas"); c.width = w; c.height = h; return c; }
+function woodGrain(c, x, y, w, h, rng, color, n, vertical) {
+  c.save(); c.strokeStyle = color;
+  for (let i = 0; i < n; i++) {
+    c.globalAlpha = 0.08 + rng() * 0.18; c.lineWidth = (0.6 + rng() * 1.6) * S / 32;
+    c.beginPath();
+    const o = rng() * (vertical ? w : h), amp = (1 + rng() * 4) * S / 32, ph = rng() * 6, fr = 0.004 + rng() * 0.01;
+    const len = vertical ? h : w;
+    for (let t = 0; t <= len; t += 6) {
+      const q = o + Math.sin(t * fr + ph) * amp + Math.sin(t * fr * 3.1 + ph * 2) * amp * 0.3;
+      vertical ? (t ? c.lineTo(x + q, y + t) : c.moveTo(x + q, y + t)) : (t ? c.lineTo(x + t, y + q) : c.moveTo(x + t, y + q));
+    }
+    c.stroke();
+  }
+  c.restore();
+}
+function buildLayers() {
+  const { W, H, g } = lv, w = W * S, h = H * S;
+  const rng = mulberry32(lv.L * 31 + 5);
+  baseLayer = mkCanvas(w * dpr, h * dpr);
+  let c = baseLayer.getContext("2d"); c.scale(dpr, dpr);
+  // 木板（墙）
+  const gr = c.createLinearGradient(0, 0, w, h);
+  gr.addColorStop(0, "#c7834a"); gr.addColorStop(1, "#a9682f");
+  c.fillStyle = gr; c.fillRect(0, 0, w, h);
+  woodGrain(c, 0, 0, w, h, rng, "#6e3c14", Math.round(h / 5), false);
+  // 通道
+  const floorPath = new Path2D();
+  for (let i = 0; i < g.length; i++) if (g[i] === 1) floorPath.rect((i % W) * S, Math.floor(i / W) * S, S, S);
+  c.save(); c.clip(floorPath);
+  c.fillStyle = "#e9c690"; c.fillRect(0, 0, w, h);
+  woodGrain(c, 0, 0, w, h, rng, "#b98a4c", Math.round(w / 6), true);
+  c.restore();
+  // 阴影：通道凹下去，墙的上沿/左沿投影在通道里
+  shadeLayer = mkCanvas(w * dpr, h * dpr);
+  c = shadeLayer.getContext("2d"); c.scale(dpr, dpr);
+  const sh = S * 0.24, sw = S * 0.14;
+  for (let i = 0; i < g.length; i++) {
+    if (g[i] !== 1) continue;
+    const x = (i % W) * S, y = Math.floor(i / W) * S;
+    if (g[i - W] === 2) { const lg = c.createLinearGradient(0, y, 0, y + sh); lg.addColorStop(0, "rgba(40,18,4,.55)"); lg.addColorStop(1, "rgba(40,18,4,0)"); c.fillStyle = lg; c.fillRect(x, y, S, sh); }
+    if (g[i - 1] === 2) { const lg = c.createLinearGradient(x, 0, x + sw, 0); lg.addColorStop(0, "rgba(40,18,4,.35)"); lg.addColorStop(1, "rgba(40,18,4,0)"); c.fillStyle = lg; c.fillRect(x, y, sw, S); }
+    if (g[i + W] === 2) { c.fillStyle = "rgba(255,235,200,.35)"; c.fillRect(x, y + S - Math.max(1, S * 0.05), S, Math.max(1, S * 0.05)); }
+    if (g[i + 1] === 2) { c.fillStyle = "rgba(60,30,8,.18)"; c.fillRect(x + S - Math.max(1, S * 0.04), y, Math.max(1, S * 0.04), S); }
+  }
+  // 墙顶亮边：通道上方那一格墙的底边
+  c.fillStyle = "rgba(60,25,5,.55)";
+  for (let i = 0; i < g.length; i++) if (g[i] === 1 && g[i - W] === 2) c.fillRect((i % W) * S, Math.floor(i / W) * S, S, Math.max(1, S * 0.035));
+  // 染料纹理（带颗粒感）
+  const ps = Math.max(32, Math.round(S * 1.5) * dpr);
+  const pc = mkCanvas(ps, ps), p = pc.getContext("2d"), prng = mulberry32(worldOf(lv.L) + 99);
+  p.fillStyle = paint.c; p.fillRect(0, 0, ps, ps);
+  for (let i = 0; i < ps * ps / 10; i++) {
+    const r = prng();
+    p.fillStyle = r < 0.45 ? paint.hi : r < 0.85 ? paint.lo : "#ffffff";
+    p.globalAlpha = r < 0.85 ? 0.35 + prng() * 0.4 : 0.5;
+    const s = (r < 0.85 ? 1 + prng() * 1.6 : 1) * dpr * 0.8;
+    p.fillRect(prng() * ps, prng() * ps, s, s);
+  }
+  pattern = ctx.createPattern(pc, "repeat");
+}
+function cellXY(c) { return [(c % lv.W + 0.5) * S, (Math.floor(c / lv.W) + 0.5) * S]; }
+function ballXY(now) {
+  if (anim) {
+    const [x0, y0] = cellXY(anim.from), k = (anim.f || 0) * anim.n * S;
+    const v = [[0, -1], [1, 0], [0, 1], [-1, 0]][anim.d];
+    return [x0 + v[0] * k, y0 + v[1] * k];
+  }
+  const [x, y] = cellXY(pos);
+  if (bump) {
+    const t = (now - bump.t0) / (bump.soft ? 160 : 180);
+    if (t >= 1) bump = null;
+    else { const v = [[0, -1], [1, 0], [0, 1], [-1, 0]][bump.d], a = Math.sin(t * Math.PI) * S * (bump.soft ? 0.06 : 0.12); return [x + v[0] * a, y + v[1] * a]; }
+  }
+  return [x, y];
+}
+function render(now) {
+  step(now);
+  const W = lv.W, w = W * S, h = lv.H * S;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.drawImage(baseLayer, 0, 0);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  // 染色
+  ctx.fillStyle = pattern;
+  ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0);
+  for (let i = 0; i < painted.length; i++) {
+    if (!painted[i]) continue;
+    const x = (i % W) * S * dpr, y = Math.floor(i / W) * S * dpr, s = S * dpr;
+    const t = Math.min(1, (now - paintAt[i]) / 180);
+    if (t >= 1) ctx.fillRect(x, y, s + 0.5, s + 0.5);
+    else { const k = 0.35 + 0.65 * (1 - Math.pow(1 - t, 3)), m = s * (1 - k) / 2; ctx.fillRect(x + m, y + m, s * k + 0.5, s * k + 0.5); }
+  }
+  ctx.restore();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.drawImage(shadeLayer, 0, 0);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  // 提示箭头
+  const [bx, by] = ballXY(now);
+  if (hint && !anim) {
+    const v = [[0, -1], [1, 0], [0, 1], [-1, 0]][hint.d], pulse = (Math.sin((now - hint.t0) / 160) + 1) / 2;
+    const dist = S * (0.75 + pulse * 0.2);
+    ctx.save(); ctx.translate(bx + v[0] * dist, by + v[1] * dist); ctx.rotate(Math.atan2(v[1], v[0]));
+    ctx.fillStyle = "rgba(255,255,255,.95)"; ctx.strokeStyle = "rgba(0,0,0,.35)"; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(S * 0.28, 0); ctx.lineTo(-S * 0.14, -S * 0.24); ctx.lineTo(-S * 0.14, S * 0.24); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.restore();
+  }
+  // 小球
+  const r = S * 0.36;
+  let sx = 1, sy = 1;
+  if (anim) { const st = Math.min(0.14, anim.n * 0.025) * (1 - (anim.f || 0) * 0.6); if (anim.d % 2) { sx = 1 + st; sy = 1 - st * 0.6; } else { sy = 1 + st; sx = 1 - st * 0.6; } }
+  ctx.save(); ctx.translate(bx, by);
+  ctx.fillStyle = "rgba(20,8,0,.35)";
+  ctx.beginPath(); ctx.ellipse(r * 0.12, r * 0.32, r * sx * 0.95, r * sy * 0.75, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.scale(sx, sy);
+  const rg = ctx.createRadialGradient(-r * 0.35, -r * 0.4, r * 0.1, 0, 0, r);
+  rg.addColorStop(0, paint.hi); rg.addColorStop(0.55, paint.c); rg.addColorStop(1, paint.lo);
+  ctx.fillStyle = rg; ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = "rgba(255,255,255,.35)"; ctx.lineWidth = Math.max(1, S * 0.03); ctx.stroke();
+  ctx.fillStyle = "rgba(255,255,255,.85)";
+  ctx.beginPath(); ctx.ellipse(-r * 0.32, -r * 0.42, r * 0.26, r * 0.15, -0.6, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+  // 粒子
+  if (particles.length) {
+    for (const p of particles) {
+      p.x += p.vx; p.y += p.vy; p.vy += 0.18 * S / 32; p.vx *= 0.98; p.life -= 0.012;
+      ctx.globalAlpha = Math.max(0, p.life); ctx.fillStyle = p.c;
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.r * S / 32, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    particles = particles.filter(p => p.life > 0 && p.y < h + 40 && p.x > -40 && p.x < w + 40);
+  }
+  requestAnimationFrame(render);
+}
+
+/* ================= 输入 ================= */
+const KEYS = { ArrowUp: 0, ArrowRight: 1, ArrowDown: 2, ArrowLeft: 3, w: 0, d: 1, s: 2, a: 3, W: 0, D: 1, S: 2, A: 3 };
+function anyMaskOn() { return document.querySelector(".mask.on"); }
+addEventListener("keydown", e => {
+  if (e.ctrlKey || e.metaKey || e.altKey) { if ((e.ctrlKey || e.metaKey) && (e.key === "z" || e.key === "Z")) { e.preventDefault(); if (!anyMaskOn()) undo(); } return; }
+  const m = anyMaskOn();
+  if (m) {
+    if (e.key === "Escape") { if (m.id === "winMask") return; hideMask(m.id); }
+    return;
+  }
+  if (e.key in KEYS) { e.preventDefault(); tryMove(KEYS[e.key]); }
+  else if (e.key === "z" || e.key === "Z" || e.key === "Backspace") undo();
+  else if (e.key === "r" || e.key === "R") restart();
+  else if (e.key === "h" || e.key === "H") showHint();
+  else if (e.key === "l" || e.key === "L") openLevels();
+});
+const stage = $("stage");
+let drag = null;
+const SWIPE = () => Math.max(22, Math.min(40, S * 0.9));
+stage.addEventListener("pointerdown", e => { drag = { id: e.pointerId, x: e.clientX, y: e.clientY }; try { stage.setPointerCapture(e.pointerId); } catch (_) {} });
+stage.addEventListener("pointermove", e => {
+  if (!drag || drag.id !== e.pointerId) return;
+  const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+  if (Math.hypot(dx, dy) < SWIPE()) return;
+  const d = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 1 : 3) : (dy > 0 ? 2 : 0);
+  if (d === drag.last) { drag.x = e.clientX; drag.y = e.clientY; return; } // 同方向继续拖不重复触发
+  tryMove(d);
+  drag.last = d; drag.x = e.clientX; drag.y = e.clientY; // 不松手换方向可以继续走
+});
+const endDrag = e => { if (drag && drag.id === e.pointerId) drag = null; };
+stage.addEventListener("pointerup", endDrag);
+stage.addEventListener("pointercancel", endDrag);
+
+/* ================= 界面 ================= */
+function showMask(id) { $(id).classList.add("on"); }
+function hideMask(id) { $(id).classList.remove("on"); }
+$("bUndo").onclick = undo;
+$("bRestart").onclick = restart;
+$("bHint").onclick = showHint;
+$("bLevels").onclick = openLevels;
+$("bNext").onclick = () => loadLevel(lv.L + 1);
+$("bReplay").onclick = () => loadLevel(lv.L);
+$("lvClose").onclick = () => hideMask("lvMask");
+$("helpOk").onclick = () => { hideMask("helpMask"); save.seenHelp = true; persist(); };
+for (const id of ["lvMask", "helpMask"]) $(id).addEventListener("click", e => { if (e.target.id === id) { hideMask(id); if (id === "helpMask") { save.seenHelp = true; persist(); } } });
+function openLevels() {
+  const box = $("lvList"); box.innerHTML = "";
+  for (let wd = 0; wd * 10 < LEVELS; wd++) {
+    const p = PAINTS[wd % PAINTS.length];
+    box.insertAdjacentHTML("beforeend", `<div class="world"><i style="background:${p.c}"></i>${p.name} · ${wd * 10 + 1}–${wd * 10 + 10}</div>`);
+    const grid = document.createElement("div"); grid.className = "grid";
+    for (let L = wd * 10 + 1; L <= wd * 10 + 10; L++) {
+      const b = document.createElement("button"); b.className = "lv" + (L === lv.L ? " cur" : "");
+      const st = save.stars[L] || 0;
+      b.innerHTML = `${L}<small>${"★".repeat(st)}</small>`;
+      if (L > save.unlocked) { b.disabled = true; b.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg><small></small>`; }
+      b.onclick = () => { hideMask("lvMask"); loadLevel(L); };
+      grid.appendChild(b);
+    }
+    box.appendChild(grid);
+  }
+  showMask("lvMask");
+  const cur = box.querySelector(".cur"); if (cur) cur.scrollIntoView({ block: "center" });
+}
+let rz; addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(layout, 80); });
+
+loadLevel(Math.min(save.cur || 1, save.unlocked));
+if (!save.seenHelp) showMask("helpMask");
+requestAnimationFrame(render);
+</script>
